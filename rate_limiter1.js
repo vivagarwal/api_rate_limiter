@@ -25,7 +25,7 @@ client.on('error', (err) => console.log('Redis Client Error', err));
 
 // Middleware Definition
 const ratelimiter = async (req, res, next) => {
-  const userId = req.headers['user_id'];
+  const userId = req.headers['user_id']||req.query.user_id;
   if (!userId) {
     return res.status(400).json({ message: 'Missing user_id in headers' });
   }

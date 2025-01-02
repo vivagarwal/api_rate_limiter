@@ -8,9 +8,9 @@
 
 You can test the live deployed version here:
 
-🔗 [https://api-rate-limiter-598c.onrender.com](https://api-rate-limiter-598c.onrender.com)
+🔗 [https://api-rate-limiter-598c.onrender.com?user_id=1](https://api-rate-limiter-598c.onrender.com?user_id=1)
 
-Note that we need to pass "user_id" as a key in request header as it is the pivot on which middleware performs checks
+Note that we need to pass "user_id" as a key in request header or give it as a query parameter as it is the pivot on which middleware performs checks
 
 ---
 
