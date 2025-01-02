@@ -1,31 +1,49 @@
-//sliding window algorithm
-const Redis = require("ioredis");
-const moment = require("moment");
-const redisClient = new Redis({ url: "redis://localhost:6379" });
+const { createClient } = require('redis');
+const moment = require('moment');
+require('dotenv').config(); // Load environment variables
 
-const RATELIMIT_DURATION_IN_SECONDS = 60;
-const NUMBER_OF_REQUEST_ALLOWED = 5;
+// Load configuration from environment variables
+const RATELIMIT_DURATION_IN_SECONDS = parseInt(process.env.RATELIMIT_DURATION_IN_SECONDS, 10) || 60;
+const NUMBER_OF_REQUEST_ALLOWED = parseInt(process.env.NUMBER_OF_REQUEST_ALLOWED, 10) || 5;
 
+// Initialize Redis Client using environment variables
+const client = createClient({
+  username: process.env.REDIS_USERNAME,
+  password: process.env.REDIS_PASSWORD,
+  socket: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT, 10),
+  },
+});
+
+client.on('error', (err) => console.log('Redis Client Error', err));
+
+// Connect Redis Client
+(async () => {
+  await client.connect();
+})();
+
+// Middleware Definition
 const ratelimiter = async (req, res, next) => {
-  const userId = req.headers["user_id"]; 
+  const userId = req.headers['user_id'];
   if (!userId) {
-    return res.status(400).json({ message: "Missing user_id in headers" });
+    return res.status(400).json({ message: 'Missing user_id in headers' });
   }
 
-  const currentTime = moment().unix(); 
-  const result = await redisClient.hgetall(userId);
+  const currentTime = moment().unix();
+  const result = await client.hGetAll(userId);
 
   if (Object.keys(result).length === 0) {
     let timestampArray = [];
     timestampArray.push(currentTime);
-    await redisClient.hset(userId, "createdAt", JSON.stringify(timestampArray), "count", 1);
-    //await redisClient.expire(userId, RATELIMIT_DURATION_IN_SECONDS + 20);
+    await client.hSet(userId, 'createdAt', JSON.stringify(timestampArray), 'count', 1);
+    await client.expire(userId, RATELIMIT_DURATION_IN_SECONDS + 10);
     return next();
   }
 
   if (result) {
-    const existingArray = JSON.parse(result["createdAt"]);
-    let timestampArray = [...existingArray]; // Copy to avoid mutating original array
+    const existingArray = JSON.parse(result['createdAt']);
+    let timestampArray = [...existingArray];
 
     // Remove timestamps outside the valid window
     timestampArray = timestampArray.filter(
@@ -33,23 +51,23 @@ const ratelimiter = async (req, res, next) => {
     );
 
     if (timestampArray.length >= NUMBER_OF_REQUEST_ALLOWED) {
-      return res.status(429).json({ message: "Too many incoming requests" });
+      return res.status(429).json({ message: 'Too many incoming requests' });
     }
 
     // Add the current request's timestamp and update the count
     timestampArray.push(currentTime);
-    await redisClient.hset(
+    await client.hSet(
       userId,
-      "createdAt",
+      'createdAt',
       JSON.stringify(timestampArray),
-      "count",
+      'count',
       timestampArray.length
     );
-    //await redisClient.expire(userId, RATELIMIT_DURATION_IN_SECONDS + 20); // Reset expiration
+    await client.expire(userId, RATELIMIT_DURATION_IN_SECONDS + 10);
     return next();
   }
 
-  return res.status(500).json({ message: "Unexpected error occurred" });
+  return res.status(500).json({ message: 'Unexpected error occurred' });
 };
 
 module.exports = ratelimiter;
