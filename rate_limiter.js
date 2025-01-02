@@ -1,3 +1,4 @@
+//fixed window algorithm
 const Redis = require("ioredis");
 const moment = require("moment");
 const redisClient = new Redis({ url: "redis://localhost:6379" });
